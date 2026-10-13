@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
+import '../core/services/firebase_service.dart';
 import '../models/user_model.dart';
 
 class AuthViewModel extends ChangeNotifier {
@@ -39,6 +40,8 @@ class AuthViewModel extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_userPrefsKey, user.toJson());
+    // Sync to Cloud Firestore if Firebase project is connected
+    await FirebaseService().syncUserToFirestore(user);
   }
 
   /// Sign in with third-party OAuth provider (Google, Discord, Apple) for free
@@ -50,20 +53,29 @@ class AuthViewModel extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
-    await Future.delayed(const Duration(milliseconds: 650));
+    // Attempt live Firebase Auth if a Firebase project is connected
+    final fbCred =
+        await FirebaseService().signInWithFirebaseProvider(providerName);
 
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    final fbUser = fbCred?.user;
     final name = customName?.trim().isNotEmpty == true
         ? customName!.trim()
-        : '$providerName Explorer';
+        : (fbUser?.displayName?.isNotEmpty == true
+              ? fbUser!.displayName!
+              : '$providerName Explorer');
     final email = customEmail?.trim().isNotEmpty == true
         ? customEmail!.trim()
-        : '${providerName.toLowerCase()}.user@candyai.app';
+        : (fbUser?.email?.isNotEmpty == true
+              ? fbUser!.email!
+              : '${providerName.toLowerCase()}.user@candyai.app');
 
     final user = UserModel(
-      id: const Uuid().v4(),
+      id: fbUser?.uid ?? const Uuid().v4(),
       name: name,
       email: email,
-      avatarUrl:
+      avatarUrl: fbUser?.photoURL ??
           'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
       authProvider: providerName,
       tokens: 150, // Free welcome tokens

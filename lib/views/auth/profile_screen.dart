@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/services/llm_config_service.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../../viewmodels/character_viewmodel.dart';
 import '../payment/subscription_screen.dart';
+import 'api_settings_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -142,6 +144,35 @@ class ProfileScreen extends StatelessWidget {
             const SizedBox(height: 22),
 
             // Menu Options
+            ListTile(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: const BorderSide(color: AppColors.primaryPink),
+              ),
+              tileColor: AppColors.surface,
+              leading: const Icon(
+                Icons.key_rounded,
+                color: AppColors.primaryPink,
+              ),
+              title: const Text(
+                'Firebase & Custom LLM API Key',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
+              subtitle: Text(
+                'Active LLM: ${context.watch<LlmConfigService>().provider} • Key: ${context.watch<LlmConfigService>().apiKey.isNotEmpty ? "Configured ✓" : "Tap to create"}',
+                style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+              ),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const ApiSettingsScreen(),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 12),
             ListTile(
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),

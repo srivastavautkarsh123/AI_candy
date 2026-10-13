@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../core/services/ai_service.dart';
+import '../core/services/firebase_service.dart';
 import '../models/character_model.dart';
 
 class CharacterViewModel extends ChangeNotifier {
@@ -193,6 +194,9 @@ class CharacterViewModel extends ChangeNotifier {
       _customCharsKey,
       _customCharacters.map((c) => json.encode(c.toMap())).toList(),
     );
+
+    // Sync custom character to Cloud Firestore when Firebase is connected
+    await FirebaseService().syncCharacterToFirestore(newChar);
 
     return newChar;
   }
