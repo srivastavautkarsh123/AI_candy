@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../firebase_options.dart';
 import '../../models/character_model.dart';
@@ -17,6 +18,10 @@ class FirebaseService extends ChangeNotifier {
   static const String _prefProjectId = 'fb_custom_project_id';
   static const String _prefSenderId = 'fb_custom_sender_id';
 
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: ['email', 'profile'],
+  );
+
   bool _isConnected = false;
   String? _connectedProjectId;
   String? _lastError;
@@ -25,7 +30,7 @@ class FirebaseService extends ChangeNotifier {
   String? get connectedProjectId => _connectedProjectId;
   String? get lastError => _lastError;
 
-  /// Initializes Firebase using either saved runtime credentials or DefaultFirebaseOptions
+  /// Initializes Firebase using DefaultFirebaseOptions or saved runtime credentials
   Future<void> initialize() async {
     try {
       if (Firebase.apps.isNotEmpty) {
@@ -39,7 +44,7 @@ class FirebaseService extends ChangeNotifier {
       final customApiKey = prefs.getString(_prefApiKey) ?? '';
       final customAppId = prefs.getString(_prefAppId) ?? '';
       final customProjectId = prefs.getString(_prefProjectId) ?? '';
-      final customSenderId = prefs.getString(_prefSenderId) ?? '000000000000';
+      final customSenderId = prefs.getString(_prefSenderId) ?? '588872692639';
 
       if (customApiKey.isNotEmpty &&
           customAppId.isNotEmpty &&
@@ -68,7 +73,7 @@ class FirebaseService extends ChangeNotifier {
     } catch (e) {
       _isConnected = false;
       _lastError = e.toString();
-      debugPrint('Firebase init notice (running in local hybrid mode): $e');
+      debugPrint('Firebase init notice: $e');
     }
     notifyListeners();
   }
@@ -78,7 +83,7 @@ class FirebaseService extends ChangeNotifier {
     required String apiKey,
     required String appId,
     required String projectId,
-    String messagingSenderId = '000000000000',
+    String messagingSenderId = '588872692639',
   }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -111,19 +116,79 @@ class FirebaseService extends ChangeNotifier {
     }
   }
 
-  /// Sign in with Firebase Google OAuth / Anonymous Auth when Firebase is connected
-  Future<UserCredential?> signInWithFirebaseProvider(String providerName) async {
-    if (!_isConnected) return null;
+  /// Sign in with Google using Firebase Authentication on Android, iOS, or Web
+  Future<UserCredential?> signInWithGoogle() async {
+    await initialize();
     try {
       final auth = FirebaseAuth.instance;
-      if (providerName == 'Google' && kIsWeb) {
-        final googleProvider = GoogleAuthProvider();
+
+      if (kIsWeb) {
+        final GoogleAuthProvider googleProvider = GoogleAuthProvider();
+        googleProvider.addScope('email');
+        googleProvider.addScope('profile');
         return await auth.signInWithPopup(googleProvider);
+      } else {
+        // Native Android / iOS Google Sign-In
+        final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+        if (googleUser == null) {
+          // User canceled the sign-in flow
+          return null;
+        }
+
+        final GoogleSignInAuthentication googleAuth =
+            await googleUser.authentication;
+
+        final OAuthCredential credential = GoogleAuthProvider.credential(
+          accessToken: googleAuth.accessToken,
+          idToken: googleAuth.idToken,
+        );
+
+        return await auth.signInWithCredential(credential);
       }
-      return await auth.signInAnonymously();
     } catch (e) {
-      debugPrint('Firebase Auth fallback: $e');
-      return null;
+      _lastError = e.toString();
+      debugPrint('Google Sign-In Error: $e');
+      rethrow;
+    }
+  }
+
+  /// Sign in or Sign up with Email and Password
+  Future<UserCredential?> signInWithEmailPassword({
+    required String email,
+    required String password,
+  }) async {
+    await initialize();
+    final auth = FirebaseAuth.instance;
+    try {
+      return await auth.signInWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'user-not-found' || e.code == 'invalid-credential') {
+        // Auto-register if new user
+        return await auth.createUserWithEmailAndPassword(
+          email: email.trim(),
+          password: password,
+        );
+      }
+      rethrow;
+    }
+  }
+
+  /// Sign out from Firebase and Google
+  Future<void> signOut() async {
+    try {
+      if (kIsWeb) {
+        await FirebaseAuth.instance.signOut();
+      } else {
+        await Future.wait([
+          FirebaseAuth.instance.signOut(),
+          _googleSignIn.signOut(),
+        ]);
+      }
+    } catch (e) {
+      debugPrint('Sign-out error: $e');
     }
   }
 

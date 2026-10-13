@@ -13,13 +13,30 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
   bool _showEmailForm = false;
 
   @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
+    _passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleGoogleSignIn() async {
+    final authVm = context.read<AuthViewModel>();
+    final success = await authVm.signInWithGoogle();
+    if (!mounted) return;
+
+    if (!success && authVm.errorMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Google Sign-In Notice: ${authVm.errorMessage}'),
+          backgroundColor: AppColors.errorRed,
+        ),
+      );
+    }
   }
 
   Future<void> _handleOAuth(String provider) async {
@@ -28,6 +45,7 @@ class _LoginScreenState extends State<LoginScreen> {
       providerName: provider,
       customName: _nameController.text,
       customEmail: _emailController.text,
+      customPassword: _passwordController.text,
     );
   }
 
@@ -177,7 +195,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         isGradient: true,
                         label: 'Continue with Google (Free)',
                         isLoading: authVm.isLoading,
-                        onTap: () => _handleOAuth('Google'),
+                        onTap: _handleGoogleSignIn,
                       ),
                       const SizedBox(height: 12),
                       _OAuthButton(
@@ -207,13 +225,13 @@ class _LoginScreenState extends State<LoginScreen> {
                         icon: Icon(
                           _showEmailForm
                               ? Icons.keyboard_arrow_up_rounded
-                              : Icons.person_outline_rounded,
+                              : Icons.email_outlined,
                           color: AppColors.textSecondary,
                         ),
                         label: Text(
                           _showEmailForm
-                              ? 'Hide Custom Profile Form'
-                              : 'Or customize your nickname & email',
+                              ? 'Hide Email Sign-In Form'
+                              : 'Or Sign In with Email & Password',
                           style: const TextStyle(color: AppColors.textSecondary),
                         ),
                       ),
@@ -223,7 +241,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         TextField(
                           controller: _nameController,
                           decoration: const InputDecoration(
-                            hintText: 'Your Nickname (e.g. Alex)',
+                            hintText: 'Your Display Name (Optional)',
                             prefixIcon: Icon(Icons.badge_outlined),
                           ),
                         ),
@@ -234,6 +252,15 @@ class _LoginScreenState extends State<LoginScreen> {
                           decoration: const InputDecoration(
                             hintText: 'Email Address',
                             prefixIcon: Icon(Icons.email_outlined),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _passwordController,
+                          obscureText: true,
+                          decoration: const InputDecoration(
+                            hintText: 'Password (min 6 characters)',
+                            prefixIcon: Icon(Icons.lock_outline_rounded),
                           ),
                         ),
                         const SizedBox(height: 14),
@@ -252,7 +279,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ? null
                                 : () => _handleOAuth('Email'),
                             child: const Text(
-                              'Enter Candy.ai Free',
+                              'Sign In / Register with Email',
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w700,
@@ -322,16 +349,27 @@ class _OAuthButton extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, color: iconColor, size: 28),
-              const SizedBox(width: 10),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 15.5,
-                  fontWeight: FontWeight.w700,
+              if (isLoading)
+                const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    color: Colors.white,
+                  ),
+                )
+              else ...[
+                Icon(icon, color: iconColor, size: 28),
+                const SizedBox(width: 10),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),

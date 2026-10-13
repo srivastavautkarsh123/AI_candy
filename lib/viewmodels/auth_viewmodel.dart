@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
@@ -9,10 +10,12 @@ class AuthViewModel extends ChangeNotifier {
 
   UserModel? _currentUser;
   bool _isLoading = false;
+  String? _errorMessage;
 
   UserModel? get currentUser => _currentUser;
   bool get isLoggedIn => _currentUser != null;
   bool get isLoading => _isLoading;
+  String? get errorMessage => _errorMessage;
 
   AuthViewModel() {
     _loadSavedUser();
@@ -44,32 +47,89 @@ class AuthViewModel extends ChangeNotifier {
     await FirebaseService().syncUserToFirestore(user);
   }
 
-  /// Sign in with third-party OAuth provider (Google, Discord, Apple) for free
+  /// Sign in with Google using Firebase Authentication
+  Future<bool> signInWithGoogle() async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final fbCred = await FirebaseService().signInWithGoogle();
+      if (fbCred == null || fbCred.user == null) {
+        // User canceled Google account selection
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
+      final fbUser = fbCred.user!;
+      final user = UserModel(
+        id: fbUser.uid,
+        name: fbUser.displayName?.isNotEmpty == true
+            ? fbUser.displayName!
+            : 'Google Explorer',
+        email: fbUser.email ?? 'google.user@candyai.app',
+        avatarUrl: fbUser.photoURL ??
+            'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
+        authProvider: 'Google',
+        tokens: 150, // Free welcome tokens
+        isPro: false,
+        lastDailyReward: DateTime.now(),
+      );
+
+      await _saveUser(user);
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = e.toString();
+      debugPrint('Sign in with Google error: $e');
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Sign in with third-party OAuth or custom name/email
   Future<void> signInWithThirdParty({
     required String providerName,
     String? customName,
     String? customEmail,
+    String? customPassword,
   }) async {
+    if (providerName == 'Google') {
+      await signInWithGoogle();
+      return;
+    }
+
     _isLoading = true;
+    _errorMessage = null;
     notifyListeners();
 
-    // Attempt live Firebase Auth if a Firebase project is connected
-    final fbCred =
-        await FirebaseService().signInWithFirebaseProvider(providerName);
-
-    await Future.delayed(const Duration(milliseconds: 500));
+    UserCredential? fbCred;
+    if (customEmail?.trim().isNotEmpty == true &&
+        customPassword?.trim().isNotEmpty == true) {
+      try {
+        fbCred = await FirebaseService().signInWithEmailPassword(
+          email: customEmail!.trim(),
+          password: customPassword!.trim(),
+        );
+      } catch (e) {
+        debugPrint('Email auth notice: $e');
+      }
+    }
 
     final fbUser = fbCred?.user;
     final name = customName?.trim().isNotEmpty == true
         ? customName!.trim()
         : (fbUser?.displayName?.isNotEmpty == true
-              ? fbUser!.displayName!
-              : '$providerName Explorer');
+            ? fbUser!.displayName!
+            : '$providerName Explorer');
     final email = customEmail?.trim().isNotEmpty == true
         ? customEmail!.trim()
         : (fbUser?.email?.isNotEmpty == true
-              ? fbUser!.email!
-              : '${providerName.toLowerCase()}.user@candyai.app');
+            ? fbUser!.email!
+            : '${providerName.toLowerCase()}.user@candyai.app');
 
     final user = UserModel(
       id: fbUser?.uid ?? const Uuid().v4(),
@@ -78,7 +138,7 @@ class AuthViewModel extends ChangeNotifier {
       avatarUrl: fbUser?.photoURL ??
           'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
       authProvider: providerName,
-      tokens: 150, // Free welcome tokens
+      tokens: 150,
       isPro: false,
       lastDailyReward: DateTime.now(),
     );
@@ -122,6 +182,7 @@ class AuthViewModel extends ChangeNotifier {
   }
 
   Future<void> signOut() async {
+    await FirebaseService().signOut();
     _currentUser = null;
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
