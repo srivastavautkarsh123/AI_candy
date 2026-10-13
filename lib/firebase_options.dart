@@ -46,22 +46,22 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: _apiKey,
-    appId: _appId,
-    messagingSenderId: _messagingSenderId,
-    projectId: _projectId,
-    authDomain: '$_projectId.firebaseapp.com',
-    storageBucket: '$_projectId.firebasestorage.app',
+    apiKey: 'AIzaSyDebL8Ev5QJ0dj8g-q_cK-9O4tuhEq6UuM',
+    appId: '1:588872692639:web:9472288f92b09287bd83aa',
+    messagingSenderId: '588872692639',
+    projectId: 'candychatting',
+    authDomain: 'candychatting.firebaseapp.com',
+    storageBucket: 'candychatting.firebasestorage.app',
+    measurementId: 'G-VLPJLN3GS7',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: _apiKey,
-    appId: _appId,
-    messagingSenderId: _messagingSenderId,
-    projectId: _projectId,
-    storageBucket: '$_projectId.firebasestorage.app',
+    apiKey: 'AIzaSyBQstpVK_nUQ7YXkssHML4JkXZKR_WIaNQ',
+    appId: '1:588872692639:android:20db7b35ec12451ebd83aa',
+    messagingSenderId: '588872692639',
+    projectId: 'candychatting',
+    storageBucket: 'candychatting.firebasestorage.app',
   );
-
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: _apiKey,
     appId: _appId,
